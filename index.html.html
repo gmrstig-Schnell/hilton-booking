@@ -206,6 +206,38 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'DM San
 .field input[type="text"],.field input[type="password"]{font-size:14px;padding:10px 12px}
 
 /* EMPTY / TOAST / CONFIRM */
+
+/* CALENDAR */
+.cal-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px 8px}
+.cal-month-label{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:500;color:var(--text)}
+.cal-nav{display:flex;gap:6px}
+.cal-nav-btn{width:34px;height:34px;border-radius:50%;background:var(--surface2);border:0.5px solid var(--border);color:var(--text-muted);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.cal-nav-btn:active{background:var(--surface3)}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;padding:0 12px}
+.cal-day-name{text-align:center;font-size:10px;color:var(--text-dim);letter-spacing:.06em;text-transform:uppercase;padding:6px 0}
+.cal-cell{min-height:52px;border-radius:var(--radius-sm);background:var(--surface);border:0.5px solid transparent;padding:5px 6px;cursor:pointer;transition:border-color .15s,background .15s;position:relative}
+.cal-cell:active{background:var(--surface2)}
+.cal-cell.other-month{opacity:.3;cursor:default}
+.cal-cell.today{border-color:var(--border-strong)}
+.cal-cell.has-booking{background:rgba(201,168,76,0.07);border-color:var(--border)}
+.cal-cell.selected{border-color:var(--gold);background:rgba(201,168,76,0.12)}
+.cal-cell.has-pending{background:rgba(232,160,32,0.07)}
+.cal-date{font-size:12px;font-weight:500;color:var(--text-muted)}
+.cal-cell.today .cal-date{color:var(--gold)}
+.cal-dots{display:flex;flex-wrap:wrap;gap:2px;margin-top:3px}
+.cal-dot{width:5px;height:5px;border-radius:50%}
+.cal-dot.approved{background:var(--green)}
+.cal-dot.pending{background:var(--amber)}
+.cal-detail{padding:0 16px 100px}
+.cal-detail-head{padding:14px 0 8px;display:flex;align-items:center;justify-content:space-between}
+.cal-detail-date{font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:500;color:var(--text)}
+.cal-detail-count{font-size:12px;color:var(--text-muted)}
+
+/* PDF EXPORT */
+.export-bar{padding:12px 16px;display:flex;gap:8px;border-bottom:0.5px solid var(--border)}
+.export-btn{flex:1;padding:10px;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;border:0.5px solid var(--border-strong);background:rgba(201,168,76,0.08);color:var(--gold);text-align:center}
+.export-btn:active{background:rgba(201,168,76,0.15)}
+
 .empty-state{text-align:center;padding:48px 20px;color:var(--text-dim);font-size:14px}
 .empty-icon{font-size:32px;margin-bottom:10px;opacity:.4}
 .empty-sub{font-size:12px;margin-top:6px}
@@ -262,6 +294,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'DM San
     <div class="tabs" id="mainTabs">
       <div class="tab active" id="tabBook" onclick="switchTab('book')">Book</div>
       <div class="tab" id="tabLog" onclick="switchTab('log')">Log</div>
+      <div class="tab" id="tabCal" onclick="switchTab('cal')">Calendar</div>
       <div class="tab" id="tabDash" onclick="switchTab('dash')" style="display:none">Dashboard</div>
       <div class="tab" id="tabUsers" onclick="switchTab('users')" style="display:none">Users</div>
     </div>
@@ -280,8 +313,22 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'DM San
       <input class="log-search" id="logSearch" placeholder="Search title, partner, or user..." oninput="renderLog()" />
       <div class="log-filters" id="logFilters"></div>
     </div>
+    <div class="export-bar"><button class="export-btn" onclick="exportPDF()">⬇ Export to PDF</button></div>
     <div class="log-stats" id="logStats"></div>
     <div class="log-list" id="logList"></div>
+  </div>
+
+  <!-- CALENDAR PAGE -->
+  <div class="page" id="pageCal">
+    <div class="cal-header">
+      <div class="cal-month-label" id="calMonthLabel"></div>
+      <div class="cal-nav">
+        <button class="cal-nav-btn" onclick="calPrev()">‹</button>
+        <button class="cal-nav-btn" onclick="calNext()">›</button>
+      </div>
+    </div>
+    <div class="cal-grid" id="calGrid"></div>
+    <div class="cal-detail" id="calDetail"></div>
   </div>
 
   <!-- DASHBOARD PAGE (admin only) -->
@@ -366,7 +413,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'DM San
 <div class="toast" id="toast"></div>
 
 <script>
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwVT3UnTIEyM4wlIGZrtfoqZJAFEKVLE3i8L0WeeQWEzkYass2ipJyLaoOYDigHsfbvRw/exec';
+const SCRIPT_URL = 'YOUR_APPS_SCRIPT_URL_HERE';
 
 const PARTNERS = [
   '99 TRAVELS GMBH','Eman Channel (Light upon Light)','Dome Tours International Ltd',
@@ -545,7 +592,7 @@ function renderBook(){
         <div class="booking-item-partners">${b.partners.map(p=>`<span class="p-pill">${p}</span>`).join('')}</div>
         ${canEdit?`<div class="booking-item-actions">
           <button class="b-btn edit" onclick="editBooking('${b.id}')">Edit</button>
-          <button class="b-btn cancel-b" onclick="askConfirm('Delete booking?',\`"${esc(b.title)}" will be permanently removed.\`,()=>doDelete('${b.id}'))">Cancel</button>
+          <button class="b-btn cancel-b" onclick="startDelete('${b.id}')">Cancel</button>
         </div>`:''}
       </div>`;
     });
@@ -765,7 +812,7 @@ function renderLog(){
         <div class="log-item-partners">${b.partners.map(p=>`<span class="p-pill">${p}</span>`).join('')}</div>
         <div class="log-item-actions">
           ${isPending&&currentUser.role==='admin'?`<button class="log-act-btn approve" onclick="approveBooking('${b.id}')">Approve</button><button class="log-act-btn reject" onclick="rejectBooking('${b.id}')">Reject</button>`
-          :canEdit?`<button class="log-act-btn edit" onclick="editFromLog('${b.id}')">Edit</button><button class="log-act-btn del" onclick="askConfirm('Delete booking?',\`"${esc(b.title)}" will be permanently removed.\`,()=>doDelete('${b.id}'))">Delete</button>`:''}
+          :canEdit?`<button class="log-act-btn edit" onclick="editFromLog('${b.id}')">Edit</button><button class="log-act-btn del" onclick="startDelete('${b.id}')">Delete</button>`:''}
         </div>
       </div>`;
     });
@@ -851,6 +898,11 @@ function editBooking(id){
 function editFromLog(id){switchTab('book');setTimeout(()=>editBooking(id),60);}
 
 // ── DELETE ──
+function startDelete(id){
+  const b = bookings.find(x => x.id === id);
+  const title = b ? b.title : 'This booking';
+  askConfirm('Delete booking?', '"' + title + '" will be permanently removed.', () => doDelete(id));
+}
 async function doDelete(id){
   try{
     let res;
@@ -872,7 +924,7 @@ function closeConfirm(){document.getElementById('confirmOverlay').classList.remo
 
 // ── TAB SWITCH ──
 function switchTab(tab){
-  ['book','log','dash','users'].forEach(t=>{
+  ['book','log','cal','dash','users'].forEach(t=>{
     const tabEl=document.getElementById('tab'+t.charAt(0).toUpperCase()+t.slice(1));
     const pageEl=document.getElementById('page'+t.charAt(0).toUpperCase()+t.slice(1));
     if(tabEl) tabEl.classList.toggle('active',t===tab);
@@ -880,8 +932,172 @@ function switchTab(tab){
   });
   if(tab==='log') renderLog();
   if(tab==='book') fetchAndRenderBook();
+  if(tab==='cal') renderCalendar();
   if(tab==='dash') renderDash();
   if(tab==='users') fetchUsers();
+}
+
+
+// ── CALENDAR ──────────────────────────────────────────────
+let calYear=new Date().getFullYear(), calMonth=new Date().getMonth(), calSelected=null;
+function calPrev(){ calMonth--; if(calMonth<0){calMonth=11;calYear--;} renderCalendar(); }
+function calNext(){ calMonth++; if(calMonth>11){calMonth=0;calYear++;} renderCalendar(); }
+
+function renderCalendar(){
+  const DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('calMonthLabel').textContent=MONTHS[calMonth]+' '+calYear;
+  const grid=document.getElementById('calGrid');
+  grid.innerHTML=DAYS.map(d=>`<div class="cal-day-name">${d}</div>`).join('');
+
+  const firstDay=new Date(calYear,calMonth,1).getDay();
+  const daysInMonth=new Date(calYear,calMonth+1,0).getDate();
+  const daysInPrev=new Date(calYear,calMonth,0).getDate();
+  const today=todayStr();
+
+  // Booking lookup by date
+  const byDate={};
+  bookings.forEach(b=>{
+    if(!byDate[b.date]) byDate[b.date]=[];
+    byDate[b.date].push(b);
+  });
+
+  let cells='';
+  // Prev month padding
+  for(let i=0;i<firstDay;i++){
+    const d=daysInPrev-firstDay+1+i;
+    cells+=`<div class="cal-cell other-month"><div class="cal-date">${d}</div></div>`;
+  }
+  // Current month
+  for(let d=1;d<=daysInMonth;d++){
+    const dateStr=calYear+'-'+String(calMonth+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    const dayBookings=byDate[dateStr]||[];
+    const approved=dayBookings.filter(b=>b.status==='approved'||!b.status);
+    const pending=dayBookings.filter(b=>b.status==='pending');
+    const isToday=dateStr===today;
+    const isSel=dateStr===calSelected;
+    let cls='cal-cell';
+    if(isToday) cls+=' today';
+    if(isSel) cls+=' selected';
+    else if(pending.length) cls+=' has-pending';
+    else if(approved.length) cls+=' has-booking';
+    const dots=[...approved.map(()=>'<div class="cal-dot approved"></div>'),...pending.map(()=>'<div class="cal-dot pending"></div>')].slice(0,4).join('');
+    cells+=`<div class="${cls}" onclick="calSelectDay('${dateStr}')">
+      <div class="cal-date">${d}</div>
+      ${dots?`<div class="cal-dots">${dots}</div>`:''}
+    </div>`;
+  }
+  // Next month padding
+  const remaining=(7-((firstDay+daysInMonth)%7))%7;
+  for(let i=1;i<=remaining;i++){
+    cells+=`<div class="cal-cell other-month"><div class="cal-date">${i}</div></div>`;
+  }
+  grid.innerHTML+=cells;
+
+  if(calSelected) renderCalDetail(calSelected);
+  else document.getElementById('calDetail').innerHTML=`<div class="empty-state" style="padding-top:32px"><div class="empty-icon">📅</div>Tap a date to see bookings</div>`;
+}
+
+function calSelectDay(dateStr){
+  calSelected=dateStr;
+  renderCalendar();
+}
+
+function renderCalDetail(dateStr){
+  const dayBookings=bookings.filter(b=>b.date===dateStr&&b.status!=='rejected');
+  const approved=dayBookings.filter(b=>b.status==='approved'||!b.status);
+  const pending=dayBookings.filter(b=>b.status==='pending');
+  const all=[...approved,...pending].sort((a,b)=>a.slot.localeCompare(b.slot));
+  const det=document.getElementById('calDetail');
+  if(!all.length){
+    det.innerHTML=`<div class="cal-detail-head"><div class="cal-detail-date">${fmtDate(dateStr)}</div></div><div class="empty-state" style="padding:24px 0"><div class="empty-icon">📋</div>No bookings<div class="empty-sub">Tap Book tab to create one</div></div>`;
+    return;
+  }
+  let html=`<div class="cal-detail-head"><div class="cal-detail-date">${fmtDate(dateStr)}</div><div class="cal-detail-count">${all.length} booking${all.length>1?'s':''}</div></div>`;
+  all.forEach(b=>{
+    const isPending=b.status==='pending';
+    const canEdit=currentUser&&(currentUser.role==='admin'||b.bookedBy===currentUser.name);
+    html+=`<div class="booking-item${isPending?' pending':''}">
+      ${isPending?'<span class="status-badge status-pending">Pending</span>':''}
+      <div class="booking-item-title">${b.title}</div>
+      <div class="booking-item-sub">Ibn Sina Auditorium · ${b.slot}</div>
+      ${currentUser&&currentUser.role==='admin'?`<div class="booking-item-bookedby">by ${b.bookedBy}</div>`:''}
+      <div class="booking-item-partners">${b.partners.map(p=>`<span class="p-pill">${p}</span>`).join('')}</div>
+      ${canEdit?`<div class="booking-item-actions">
+        ${isPending&&currentUser.role==='admin'?`<button class="b-btn approve" onclick="approveBooking('${b.id}');calSelectDay('${dateStr}')">Approve</button><button class="b-btn reject" onclick="rejectBooking('${b.id}');calSelectDay('${dateStr}')">Reject</button>`
+        :`<button class="b-btn edit" onclick="switchTab('book');setTimeout(()=>editBooking('${b.id}'),60)">Edit</button>
+          <button class="b-btn cancel-b" onclick="startDelete('${b.id}')">Cancel</button>`}
+      </div>`:''}
+    </div>`;
+  });
+  det.innerHTML=html;
+}
+
+// ── PDF EXPORT ─────────────────────────────────────────────
+function exportPDF(){
+  const today=todayStr();
+  const confirmed=bookings.filter(b=>b.status==='approved'||!b.status);
+  const pending=bookings.filter(b=>b.status==='pending');
+  const all=[...confirmed,...pending].filter(b=>b.status!=='rejected');
+  all.sort((a,b)=>a.date===b.date?a.slot.localeCompare(b.slot):a.date.localeCompare(b.date));
+
+  const isAdmin=currentUser&&currentUser.role==='admin';
+  const rows=all.map(b=>`
+    <tr style="border-bottom:1px solid #e8d5a3">
+      <td style="padding:8px 10px;font-size:12px">${fmtDate(b.date)}</td>
+      <td style="padding:8px 10px;font-size:12px">${b.slot}</td>
+      <td style="padding:8px 10px;font-size:13px;font-weight:500">${b.title}</td>
+      <td style="padding:8px 10px;font-size:11px;color:#555">${b.partners.join(', ')}</td>
+      ${isAdmin?`<td style="padding:8px 10px;font-size:11px;color:#888">${b.bookedBy}</td>`:''}
+      <td style="padding:8px 10px"><span style="font-size:10px;padding:2px 8px;border-radius:10px;background:${b.status==='pending'?'#fff3cd':'#d4edda'};color:${b.status==='pending'?'#856404':'#155724'}">${b.status==='pending'?'Pending':'Confirmed'}</span></td>
+    </tr>`).join('');
+
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>Ibn Sina Auditorium — Booking Summary</title>
+  <style>
+    body{font-family:Georgia,serif;margin:0;padding:32px;background:#fff;color:#222}
+    .header{border-bottom:2px solid #C9A84C;padding-bottom:16px;margin-bottom:24px}
+    .hotel{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#C9A84C;margin-bottom:4px}
+    h1{font-size:24px;font-weight:normal;margin:0 0 4px}
+    .meta{font-size:12px;color:#888}
+    .stats{display:flex;gap:24px;margin-bottom:24px}
+    .stat{text-align:center;background:#faf8f4;border:1px solid #e8d5a3;border-radius:8px;padding:12px 20px}
+    .stat-n{font-size:28px;color:#C9A84C;font-weight:bold}
+    .stat-l{font-size:10px;text-transform:uppercase;color:#888;letter-spacing:.05em}
+    table{width:100%;border-collapse:collapse}
+    thead tr{background:#1a1a2e;color:#C9A84C}
+    thead td{padding:10px;font-size:11px;letter-spacing:.05em;text-transform:uppercase}
+    tbody tr:nth-child(even){background:#faf8f4}
+    @media print{body{padding:16px}}
+  </style></head><body>
+  <div class="header">
+    <div class="hotel">Hilton Hotel &amp; Convention · Jabal Omar · Makkah</div>
+    <h1>Ibn Sina Auditorium — Booking Summary</h1>
+    <div class="meta">Generated ${new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'})} · ${isAdmin?'Full report (Admin)':'Personal bookings'}</div>
+  </div>
+  <div class="stats">
+    <div class="stat"><div class="stat-n">${confirmed.length}</div><div class="stat-l">Confirmed</div></div>
+    <div class="stat"><div class="stat-n">${confirmed.filter(b=>b.date>=today).length}</div><div class="stat-l">Upcoming</div></div>
+    <div class="stat"><div class="stat-n">${pending.length}</div><div class="stat-l">Pending</div></div>
+  </div>
+  <table>
+    <thead><tr>
+      <td>Date</td><td>Time</td><td>Title</td><td>Partners</td>
+      ${isAdmin?'<td>Booked by</td>':''}
+      <td>Status</td>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  </body></html>`;
+
+  const blob=new Blob([html],{type:'text/html'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download='ibn-sina-bookings-'+todayStr()+'.html';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('Exported — open file and Print → Save as PDF');
 }
 
 // ── HELPERS ──
